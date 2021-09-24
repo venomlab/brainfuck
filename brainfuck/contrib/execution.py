@@ -1,4 +1,5 @@
 __all__ = [
+    "execute",
     "ExecutionVisitorFactory",
     "ExecutionMoveVisitor",
     "ExecutionRootVisitor",
@@ -14,7 +15,8 @@ __all__ = [
 import sys
 from typing import Dict, Generic, TextIO, Type
 
-from ...parsing.ast import (
+from .. import Brainfuck
+from ..parsing.ast import (
     Augment,
     GetChar,
     Loop,
@@ -27,6 +29,11 @@ from ...parsing.ast import (
     Visitor,
     VisitorFactory,
 )
+
+
+def execute(bf: Brainfuck) -> None:
+    visitor_factory = ExecutionVisitorFactory()
+    bf.visit(visitor_factory)
 
 
 class ExecutionContext:

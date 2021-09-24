@@ -1,4 +1,6 @@
 __all__ = [
+    "to_python_ast",
+    "to_python_code",
     "PyASTVisitorFactory",
     "PyASTRootVisitor",
     "PyASTMoveVisitor",
@@ -13,9 +15,10 @@ __all__ = [
 
 import ast
 import itertools
-from typing import Dict, Generic, List, Tuple, Type, cast
+from typing import Dict, Generic, List, Tuple, Type, TypeVar, cast
 
-from ...parsing.ast import (
+from .. import Brainfuck
+from ..parsing.ast import (
     Augment,
     GetChar,
     Loop,
@@ -29,6 +32,39 @@ from ...parsing.ast import (
     Visitor,
     VisitorFactory,
 )
+
+_AST = TypeVar(
+    "_AST",
+    ast.Name,
+    ast.Module,
+    ast.Expr,
+    ast.Add,
+    ast.Sub,
+    ast.Constant,
+    ast.While,
+    ast.Pass,
+    ast.Call,
+    ast.Assign,
+    ast.AugAssign,
+)
+
+
+def to_python_ast(bf: Brainfuck) -> ast.AST:
+    visitor_factory = PyASTVisitorFactory()
+    visitor = cast(PyASTRootVisitor, bf.visit(visitor_factory))
+    return visitor.root_node
+
+
+def to_python_code(bf: Brainfuck) -> str:
+    return ast.unparse(to_python_ast(bf))
+
+
+def _ast(ast_type: Type[_AST], *args, **kwargs) -> _AST:
+    if ast_type in [ast.Name, ast.Subscript]:
+        kwargs.setdefault("ctx", ast.Load())
+    kwargs.setdefault("lineno", 0)
+    kwargs.setdefault("col_offset", 0)
+    return ast_type(*args, **kwargs)
 
 
 class PyASTContext:
@@ -52,25 +88,27 @@ class PyASTRootVisitor(PyASTVisitor[Root]):
     root_node: ast.AST
 
     def visit(self, node: Root) -> None:
-        assign_byte_buffer = ast.Assign(
-            targets=[ast.Name(self.ctx.buffer_var)],
-            value=ast.Call(
-                func=ast.Name(id=self.ctx.buffer_factory),
-                args=[ast.Constant(self.ctx.bytes_amount)],
+        assign_byte_buffer = _ast(
+            ast.Assign,
+            targets=[_ast(ast.Name, self.ctx.buffer_var, ctx=ast.Store())],
+            value=_ast(
+                ast.Call,
+                func=_ast(ast.Name, self.ctx.buffer_factory),
+                args=[_ast(ast.Constant, self.ctx.bytes_amount)],
                 keywords=[],
             ),
-            lineno=0,
         )
-        assign_index = ast.Assign(
-            targets=[ast.Name(self.ctx.index_var)],
-            value=ast.Constant(self.ctx.start_index),
-            lineno=0,
+        assign_index = _ast(
+            ast.Assign,
+            targets=[_ast(ast.Name, self.ctx.index_var, ctx=ast.Store())],
+            value=_ast(ast.Constant, self.ctx.start_index),
         )
         sub_node = node.node
         sub_visitor = cast(PyASTVisitor, sub_node.visitor)
         sub_visitor.visit(sub_node)
         program_ast = sub_visitor.nodes
-        self.root_node = ast.Module(
+        self.root_node = _ast(
+            ast.Module,
             body=[
                 assign_byte_buffer,
                 assign_index,
@@ -82,69 +120,71 @@ class PyASTRootVisitor(PyASTVisitor[Root]):
             self.root_node,
         ]
 
-    def to_str(self) -> str:
-        return ast.unparse(self.root_node)
-
 
 class PyASTMoveVisitor(PyASTVisitor[Move]):
     def visit(self, node: Move) -> None:
-        operation = ast.Sub() if node.value < 0 else ast.Add()
+        operation = _ast(ast.Sub, lineno=0, col_offset=0) if node.value < 0 else _ast(ast.Add, lineno=0, col_offset=0)
         self.nodes = [
-            ast.AugAssign(
-                target=ast.Name(self.ctx.index_var),
+            _ast(
+                ast.AugAssign,
+                target=_ast(ast.Name, self.ctx.index_var, ctx=ast.Store()),
                 op=operation,
-                value=ast.Constant(abs(node.value)),
-                lineno=0,
+                value=_ast(ast.Constant, abs(node.value)),
             )
         ]
 
 
 class PyASTAugmentVisitor(PyASTVisitor[Augment]):
     def visit(self, node: Augment) -> None:
-        operation = ast.Sub() if node.value < 0 else ast.Add()
+        operation = _ast(ast.Sub, lineno=0, col_offset=0) if node.value < 0 else _ast(ast.Add, lineno=0, col_offset=0)
         self.nodes = [
-            ast.AugAssign(
-                target=ast.Subscript(
-                    value=ast.Name(self.ctx.buffer_var),
-                    slice=ast.Name(self.ctx.index_var),
+            _ast(
+                ast.AugAssign,
+                target=_ast(
+                    ast.Subscript,
+                    value=_ast(ast.Name, self.ctx.buffer_var),
+                    slice=_ast(ast.Name, self.ctx.index_var),
+                    ctx=ast.Store(),
                 ),
                 op=operation,
-                value=ast.Constant(abs(node.value)),
-                lineno=0,
+                value=_ast(ast.Constant, abs(node.value)),
             )
         ]
 
 
 class PyASTGetCharVisitor(PyASTVisitor[GetChar]):
     def visit(self, node: GetChar) -> None:
-        subscript = ast.Subscript(
-            value=ast.Name(self.ctx.buffer_var),
-            slice=ast.Name(self.ctx.index_var),
+        subscript = _ast(
+            ast.Subscript,
+            value=_ast(ast.Name, self.ctx.buffer_var),
+            slice=_ast(ast.Name, self.ctx.index_var),
         )
-        read_function = ast.Call(func=ast.Name("input"), args=[], keywords=[])
-        ord_function = ast.Call(func=ast.Name("ord"), args=[read_function], keywords=[])
+        read_function = _ast(ast.Call, func=_ast(ast.Name, "input"), args=[], keywords=[])
+        ord_function = _ast(ast.Call, func=_ast(ast.Name, "ord"), args=[read_function], keywords=[])
         self.nodes = [
-            ast.Assign(
+            _ast(
+                ast.Assign,
                 targets=[subscript],
                 value=ord_function,
-                lineno=0,
             )
         ]
 
 
 class PyASTPutCharVisitor(PyASTVisitor[PutChar]):
     def visit(self, node: PutChar) -> None:
-        subscript = ast.Subscript(
-            value=ast.Name(self.ctx.buffer_var),
-            slice=ast.Name(self.ctx.index_var),
+        subscript = _ast(
+            ast.Subscript,
+            value=_ast(ast.Name, self.ctx.buffer_var),
+            slice=_ast(ast.Name, self.ctx.index_var),
         )
-        chr_function = ast.Call(func=ast.Name("chr"), args=[subscript], keywords=[])
-        print_function = ast.Call(
-            func=ast.Name("print"),
+        chr_function = _ast(ast.Call, func=_ast(ast.Name, "chr"), args=[subscript], keywords=[])
+        print_function = _ast(
+            ast.Call,
+            func=_ast(ast.Name, "print"),
             args=[chr_function],
-            keywords=[ast.keyword(arg="end", value=ast.Constant(""))],
+            keywords=[_ast(ast.keyword, arg="end", value=_ast(ast.Constant, ""))],
         )
-        self.nodes = [ast.Expr(value=print_function)]
+        self.nodes = [_ast(ast.Expr, value=print_function)]
 
 
 class PyASTSequenceVisitor(PyASTVisitor[Sequence]):
@@ -162,16 +202,19 @@ class PyASTLoopVisitor(PyASTVisitor[Loop]):
             v.visit(n)
         sub_nodes = list(itertools.chain.from_iterable(v.nodes for n, v in visitors))
         if not sub_nodes:
-            sub_nodes = [ast.Pass()]
+            sub_nodes = [_ast(ast.Pass)]
         self.nodes = [
-            ast.While(
-                test=ast.Compare(
-                    left=ast.Subscript(
-                        value=ast.Name(self.ctx.buffer_var),
-                        slice=ast.Name(self.ctx.index_var),
+            _ast(
+                ast.While,
+                test=_ast(
+                    ast.Compare,
+                    left=_ast(
+                        ast.Subscript,
+                        value=_ast(ast.Name, self.ctx.buffer_var),
+                        slice=_ast(ast.Name, self.ctx.index_var),
                     ),
-                    ops=[ast.NotEq()],
-                    comparators=[ast.Constant(0)],
+                    ops=[_ast(ast.NotEq)],
+                    comparators=[_ast(ast.Constant, 0)],
                 ),
                 body=sub_nodes,
                 orelse=[],
