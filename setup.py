@@ -7,11 +7,11 @@ with open("README.md", "r") as f:
 
 setup(
     name="brainfuck-venomlab",
-    version="0.1.0",
+    version="0.1.1",
     packages=[path for path in glob.glob("brainfuck/**/", recursive=True) if "__pycache__" not in path],
     url="https://github.com/venomlab/brainfuck",
     license="MIT",
-    download_url="https://github.com/venomlab/brainfuck/releases/tag/0.1.0",
+    download_url="https://github.com/venomlab/brainfuck/releases/tag/0.1.1",
     author="Dmitry Selishchev",
     author_email="zibertscrem@gmail.com",
     description="Brainfuck parser",
