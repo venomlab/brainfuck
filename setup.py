@@ -7,7 +7,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="brainfuck-venomlab",
-    version="0.1.0b1",
+    version="0.1.0",
     packages=[path for path in glob.glob("brainfuck/**/", recursive=True) if "__pycache__" not in path],
     url="https://github.com/venomlab/brainfuck",
     license="MIT",
