@@ -1,11 +1,9 @@
-#!/env/bin python
-
 import argparse
 import sys
 
-from brainfuck import Brainfuck
-from brainfuck.contrib.visitors.execution import ExecutionVisitorFactory
-from brainfuck.contrib.visitors.pyast import PyASTRootVisitor, PyASTVisitorFactory
+from . import Brainfuck
+from .contrib.visitors.execution import ExecutionVisitorFactory
+from .contrib.visitors.pyast import PyASTRootVisitor, PyASTVisitorFactory
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", dest="file", required=False, default=None, type=str)
@@ -13,7 +11,8 @@ parser.add_argument("-oz", dest="optimize", required=False, default=False, actio
 parser.add_argument("-py", dest="to_python", required=False, default=False, action="store_true")
 parser.add_argument("-out", dest="out", required=False, default=None, type=str)
 
-if __name__ == "__main__":
+
+def main_cli():
     namespace = parser.parse_args()
     if namespace.file:
         with open(namespace.file, "r") as file:
@@ -31,6 +30,8 @@ if __name__ == "__main__":
         if namespace.out:
             with open(namespace.out, "w") as file:
                 file.write(python_program)
-    elif namespace.out:
+        else:
+            sys.stdout.write(python_program)
+    else:
         visitor_factory = ExecutionVisitorFactory()
         bf.visit(visitor_factory)
