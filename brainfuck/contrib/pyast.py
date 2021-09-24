@@ -15,7 +15,7 @@ __all__ = [
 
 import ast
 import itertools
-from typing import Dict, Generic, List, Tuple, Type, TypeVar, cast
+from typing import Any, Dict, Generic, List, Tuple, Type, TypeVar, cast
 
 from .. import Brainfuck
 from ..parsing.ast import (
@@ -46,6 +46,10 @@ _AST = TypeVar(
     ast.Call,
     ast.Assign,
     ast.AugAssign,
+    ast.Subscript,
+    ast.keyword,
+    ast.Compare,
+    ast.NotEq,
 )
 
 
@@ -59,7 +63,7 @@ def to_python_code(bf: Brainfuck) -> str:
     return ast.unparse(to_python_ast(bf))
 
 
-def _ast(ast_type: Type[_AST], *args, **kwargs) -> _AST:
+def _ast(ast_type: Type[_AST], *args: Any, **kwargs: Any) -> _AST:
     if ast_type in [ast.Name, ast.Subscript]:
         kwargs.setdefault("ctx", ast.Load())
     kwargs.setdefault("lineno", 0)
