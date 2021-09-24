@@ -1,0 +1,24 @@
+[tool.black]
+line-length = 120
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+line_length = 120
+combine_as_imports = true
+
+[tool.flake8]
+max-line-length = 120
+inline-quotes = "double"
+multiline-quotes = "double"
+
+[tool.mypy]
+warn_redundant_casts = true
+warn_unused_ignores = false
+disallow_subclassing_any = false
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_return_any = true
+no_implicit_optional = true
+strict_optional = true
